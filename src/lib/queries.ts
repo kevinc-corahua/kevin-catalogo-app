@@ -37,6 +37,7 @@ export function serializar(p: PrendaDB) {
     tallaId: p.tallaId,
     marcaId: p.marcaId,
     createdAt: p.createdAt.toISOString(),
+    nueva: Date.now() - p.createdAt.getTime() < 7 * 86400_000,
   };
 }
 export type PrendaVista = ReturnType<typeof serializar>;
@@ -98,4 +99,15 @@ export async function obtenerOpciones() {
     db.marca.findMany({ orderBy: { nombre: "asc" } }),
   ]);
   return { tipos, generos, tallas, marcas };
+}
+
+/** Conteos globales para la cabecera del catálogo. */
+export async function resumenPublico() {
+  const rows = await db.prenda.groupBy({
+    by: ["estado"],
+    where: { deletedAt: null },
+    _count: { _all: true },
+  });
+  const n = (e: Estado) => rows.find((r) => r.estado === e)?._count._all ?? 0;
+  return { disponibles: n("DISPONIBLE"), separadas: n("SEPARADO") };
 }

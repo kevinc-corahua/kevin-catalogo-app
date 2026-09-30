@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { cambiarEstado, eliminarPrenda } from "@/actions/prendas";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { CloudImage } from "@/components/cloud-image";
+import { CampoDialog, ConfirmDialog } from "./dialogos";
 import type { PrendaVista } from "@/lib/queries";
 import { ESTADO_LABEL } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
@@ -15,28 +16,25 @@ const ESTADOS: Estado[] = ["DISPONIBLE", "SEPARADO", "VENDIDO"];
 
 export function FilaPrenda({ prenda }: { prenda: PrendaVista }) {
   const [pending, start] = useTransition();
+  const [dialogo, setDialogo] = useState<"separar" | "eliminar" | null>(null);
 
-  const cambiar = (estado: Estado) => {
-    let hasta: string | null = null;
-    if (estado === "SEPARADO") {
-      const v = window.prompt("¿Separada hasta cuándo? (AAAA-MM-DD, vacío = sin fecha)", "");
-      if (v === null) return;
-      if (v) {
-        const d = new Date(`${v}T23:59:59`);
-        if (Number.isNaN(d.getTime())) return toast.error("Fecha inválida");
-        hasta = d.toISOString();
-      }
-    }
+  const cambiar = (estado: Estado, hasta: string | null = null) => {
     start(async () => {
       await cambiarEstado(prenda.id, estado, hasta);
+      setDialogo(null);
       toast.success(`${prenda.codigo}: ${ESTADO_LABEL[estado]}`);
     });
   };
 
+  const separar = (fecha: string) => {
+    // Hasta el final del día elegido; vacío = sin fecha límite
+    cambiar("SEPARADO", fecha ? new Date(`${fecha}T23:59:59`).toISOString() : null);
+  };
+
   const borrar = () => {
-    if (!window.confirm(`¿Eliminar ${prenda.codigo} – ${prenda.nombre}?`)) return;
     start(async () => {
       await eliminarPrenda(prenda.id);
+      setDialogo(null);
       toast.success("Prenda eliminada");
     });
   };
@@ -52,7 +50,7 @@ export function FilaPrenda({ prenda }: { prenda: PrendaVista }) {
           {prenda.codigo} · {prenda.marca} · {prenda.talla} · S/ {prenda.precio.toFixed(2)}
         </p>
         {prenda.estado === "SEPARADO" && prenda.separadoHasta && (
-          <p className="text-xs text-amber-600">
+          <p className="text-xs text-ambar">
             Hasta {new Date(prenda.separadoHasta).toLocaleDateString("es-PE")}
           </p>
         )}
@@ -64,7 +62,7 @@ export function FilaPrenda({ prenda }: { prenda: PrendaVista }) {
             size="sm"
             variant={prenda.estado === e ? "default" : "outline"}
             disabled={pending || prenda.estado === e}
-            onClick={() => cambiar(e)}
+            onClick={() => (e === "SEPARADO" ? setDialogo("separar") : cambiar(e))}
           >
             {ESTADO_LABEL[e]}
           </Button>
@@ -75,10 +73,39 @@ export function FilaPrenda({ prenda }: { prenda: PrendaVista }) {
         >
           Editar
         </Link>
-        <Button size="sm" variant="ghost" className="text-destructive" disabled={pending} onClick={borrar}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-destructive"
+          disabled={pending}
+          onClick={() => setDialogo("eliminar")}
+        >
           Eliminar
         </Button>
       </div>
+
+      <CampoDialog
+        open={dialogo === "separar"}
+        onOpenChange={(o) => !o && setDialogo(null)}
+        titulo={`Separar ${prenda.codigo}`}
+        descripcion="Elige hasta qué día queda separada. Déjalo vacío si no hay fecha límite."
+        label="Separada hasta"
+        type="date"
+        opcional
+        confirmar="Separar"
+        cargando={pending}
+        onSubmit={separar}
+      />
+      <ConfirmDialog
+        open={dialogo === "eliminar"}
+        onOpenChange={(o) => !o && setDialogo(null)}
+        titulo="¿Eliminar esta prenda?"
+        descripcion={`${prenda.codigo} – ${prenda.nombre} dejará de mostrarse en el catálogo.`}
+        confirmar="Eliminar"
+        destructivo
+        cargando={pending}
+        onConfirm={borrar}
+      />
     </div>
   );
 }

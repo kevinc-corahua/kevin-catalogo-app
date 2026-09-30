@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { CLOUDINARY_FOLDER, borrarFotos } from "@/lib/cloudinary-server";
 import { requireAdmin } from "@/lib/session";
 import { prendaSchema } from "@/lib/validators";
 import type { Estado } from "@/generated/prisma/enums";
@@ -54,7 +55,10 @@ export async function editarPrenda(id: string, input: unknown) {
   await requireAdmin();
   const r = datos(input);
   if ("error" in r) return { error: r.error };
+  const antes = await db.prenda.findUnique({ where: { id }, select: { fotos: true } });
   await db.prenda.update({ where: { id }, data: r.data });
+  // Las fotos que ya no están en la prenda se borran también de Cloudinary
+  await borrarFotos((antes?.fotos ?? []).filter((f) => !r.data.fotos.includes(f)));
   refrescar(id);
   return { ok: true as const };
 }
@@ -91,4 +95,12 @@ export async function crearOpcion(tabla: "marca" | "tipo" | "talla", nombre: str
         ? await db.tipo.upsert({ where: { nombre: n }, create: { nombre: n }, update: {} })
         : await db.talla.upsert({ where: { nombre: n }, create: { nombre: n, orden: 99 }, update: {} });
   return { ok: true as const, opcion: { id: o.id, nombre: o.nombre } };
+}
+
+/** Borra una foto recién subida que el admin quitó antes de guardar (no pertenece a ninguna prenda). */
+export async function descartarFotoSubida(publicId: string) {
+  await requireAdmin();
+  if (!publicId.startsWith(`${CLOUDINARY_FOLDER}/`)) return;
+  const enUso = await db.prenda.count({ where: { fotos: { has: publicId } } });
+  if (enUso === 0) await borrarFotos([publicId]);
 }

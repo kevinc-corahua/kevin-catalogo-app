@@ -8,38 +8,57 @@ import { ESTADO_LABEL } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 
 const ESTADO_CLASE = {
-  DISPONIBLE: "bg-emerald-600 text-white",
-  SEPARADO: "bg-amber-500 text-white",
-  VENDIDO: "bg-zinc-700 text-white",
+  DISPONIBLE: "bg-primary text-primary-foreground",
+  SEPARADO: "bg-ambar text-black",
+  VENDIDO: "bg-zinc-200 text-black",
 } as const;
 
 export function PrendaCard({ prenda }: { prenda: PrendaVista }) {
-  const noDisponible = prenda.estado !== "DISPONIBLE";
+  const vendida = prenda.estado === "VENDIDO";
+
   return (
-    <Card className="overflow-hidden p-0 gap-0">
-      <Link href={`/prenda/${prenda.id}`} className="relative block aspect-[4/5] bg-muted">
+    <Card className="gap-0 overflow-hidden p-0 ring-0 border">
+      <Link href={`/prenda/${prenda.id}`} className="group relative block aspect-[4/5] overflow-hidden bg-muted">
         <CloudImage
           src={prenda.fotos[0]}
           alt={prenda.nombre}
           fill
           sizes="(min-width:1024px) 25vw, (min-width:640px) 33vw, 50vw"
-          className={cn("object-cover", noDisponible && "opacity-60")}
+          className={cn(
+            "object-cover transition-transform duration-300 group-hover:scale-105",
+            vendida && "grayscale",
+          )}
         />
-        <Badge className={cn("absolute left-2 top-2 border-0", ESTADO_CLASE[prenda.estado])}>
+        <Badge className={cn("absolute left-2 top-2 border-0 font-semibold uppercase", ESTADO_CLASE[prenda.estado])}>
           {ESTADO_LABEL[prenda.estado]}
         </Badge>
+        {prenda.nueva && prenda.estado === "DISPONIBLE" && (
+          <Badge variant="secondary" className="absolute right-2 top-2 uppercase">
+            Nuevo
+          </Badge>
+        )}
+        {vendida && (
+          <span className="absolute inset-0 grid place-items-center bg-black/40">
+            <span className="-rotate-12 border-2 border-white px-3 py-1 font-display text-xl uppercase text-white">
+              Agotado
+            </span>
+          </span>
+        )}
+        <span className="absolute bottom-2 left-2 rounded-md bg-background px-2 py-1 font-display text-lg leading-none">
+          S/ {prenda.precio.toFixed(0)}
+        </span>
       </Link>
-      <div className="flex flex-1 flex-col gap-2 p-3">
-        <div>
-          <p className="text-xs text-muted-foreground">
+
+      <div className="flex flex-1 flex-col gap-3 p-3">
+        <div className="min-w-0">
+          <p className="truncate text-xs uppercase tracking-wide text-muted-foreground">
             {prenda.marca} · Talla {prenda.talla}
           </p>
-          <Link href={`/prenda/${prenda.id}`} className="line-clamp-2 text-sm font-medium leading-tight">
+          <Link href={`/prenda/${prenda.id}`} className="line-clamp-2 text-sm font-medium leading-snug">
             {prenda.nombre}
           </Link>
         </div>
-        <p className="text-lg font-semibold">S/ {prenda.precio.toFixed(2)}</p>
-        <ComprarButton prenda={prenda} />
+        <ComprarButton prenda={prenda} className="mt-auto [&>a]:h-9 [&>a]:text-xs" />
       </div>
     </Card>
   );

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { crearOpcion, crearPrenda, editarPrenda } from "@/actions/prendas";
+import { crearOpcion, crearPrenda, descartarFotoSubida, editarPrenda } from "@/actions/prendas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { CampoDialog } from "./dialogos";
 import { SubirFotos } from "./subir-fotos";
 import type { PrendaVista } from "@/lib/queries";
 
@@ -22,14 +23,37 @@ export function PrendaForm({ opciones, prenda }: { opciones: Opciones; prenda?: 
   const [pending, start] = useTransition();
   const [fotos, setFotos] = useState<string[]>(prenda?.fotos ?? []);
   const [ops, setOps] = useState(opciones);
+  const [nuevaOpcion, setNuevaOpcion] = useState<{ tabla: "marca" | "tipo" | "talla"; key: keyof Opciones } | null>(null);
+  // Fotos subidas en esta sesión que aún no se guardaron en la prenda
+  const subidas = useRef(new Set<string>());
 
-  const agregarOpcion = async (tabla: "marca" | "tipo" | "talla", key: keyof Opciones) => {
-    const nombre = window.prompt(`Nombre de la nueva ${tabla}`);
-    if (!nombre) return;
-    const r = await crearOpcion(tabla, nombre);
-    if ("error" in r) return toast.error(r.error);
-    setOps((o) => (o[key].some((x) => x.id === r.opcion.id) ? o : { ...o, [key]: [...o[key], r.opcion] }));
-    toast.success("Agregada, selecciónala en la lista");
+  const cambiarFotos = (siguientes: string[]) => {
+    // Una foto nueva que se quita se borra ya de Cloudinary; una ya guardada se borra al guardar
+    for (const id of fotos.filter((f) => !siguientes.includes(f))) {
+      if (subidas.current.delete(id)) void descartarFotoSubida(id);
+    }
+    setFotos(siguientes);
+  };
+
+  const cancelar = () => {
+    for (const id of subidas.current) void descartarFotoSubida(id);
+    subidas.current.clear();
+    router.push("/admin");
+  };
+
+  const agregarOpcion = (nombre: string) => {
+    if (!nuevaOpcion) return;
+    const { tabla, key } = nuevaOpcion;
+    start(async () => {
+      const r = await crearOpcion(tabla, nombre);
+      if ("error" in r) {
+        toast.error(r.error);
+        return;
+      }
+      setOps((o) => (o[key].some((x) => x.id === r.opcion.id) ? o : { ...o, [key]: [...o[key], r.opcion] }));
+      setNuevaOpcion(null);
+      toast.success("Agregada, selecciónala en la lista");
+    });
   };
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -42,6 +66,7 @@ export function PrendaForm({ opciones, prenda }: { opciones: Opciones; prenda?: 
         toast.error(r.error);
         return;
       }
+      subidas.current.clear();
       toast.success(prenda ? "Prenda actualizada" : "Prenda creada");
       router.push("/admin");
     });
@@ -70,7 +95,7 @@ export function PrendaForm({ opciones, prenda }: { opciones: Opciones; prenda?: 
     <form onSubmit={onSubmit} className="space-y-5">
       <div className="space-y-2">
         <Label>Fotos (la primera es la portada)</Label>
-        <SubirFotos value={fotos} onChange={setFotos} />
+        <SubirFotos value={fotos} onChange={cambiarFotos} onSubidas={(ids) => ids.forEach((i) => subidas.current.add(i))} />
       </div>
 
       <div className="space-y-2">
@@ -79,10 +104,10 @@ export function PrendaForm({ opciones, prenda }: { opciones: Opciones; prenda?: 
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {sel("tipoId", "Tipo", ops.tipos, prenda?.tipoId, () => agregarOpcion("tipo", "tipos"))}
+        {sel("tipoId", "Tipo", ops.tipos, prenda?.tipoId, () => setNuevaOpcion({ tabla: "tipo", key: "tipos" }))}
         {sel("generoId", "Género", ops.generos, prenda?.generoId)}
-        {sel("tallaId", "Talla", ops.tallas, prenda?.tallaId, () => agregarOpcion("talla", "tallas"))}
-        {sel("marcaId", "Marca", ops.marcas, prenda?.marcaId, () => agregarOpcion("marca", "marcas"))}
+        {sel("tallaId", "Talla", ops.tallas, prenda?.tallaId, () => setNuevaOpcion({ tabla: "talla", key: "tallas" }))}
+        {sel("marcaId", "Marca", ops.marcas, prenda?.marcaId, () => setNuevaOpcion({ tabla: "marca", key: "marcas" }))}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -120,8 +145,18 @@ export function PrendaForm({ opciones, prenda }: { opciones: Opciones; prenda?: 
 
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>{pending ? "Guardando…" : "Guardar"}</Button>
-        <Button type="button" variant="outline" onClick={() => router.push("/admin")}>Cancelar</Button>
+        <Button type="button" variant="outline" onClick={cancelar}>Cancelar</Button>
       </div>
+      <CampoDialog
+        open={nuevaOpcion !== null}
+        onOpenChange={(o) => !o && setNuevaOpcion(null)}
+        titulo={`Nueva ${nuevaOpcion?.tabla ?? ""}`}
+        label="Nombre"
+        placeholder="Ej: Champion"
+        confirmar="Agregar"
+        cargando={pending}
+        onSubmit={agregarOpcion}
+      />
     </form>
   );
 }

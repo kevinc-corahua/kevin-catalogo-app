@@ -23,20 +23,33 @@ async function subir(file: File): Promise<string> {
   return data.public_id as string;
 }
 
-export function SubirFotos({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+export function SubirFotos({
+  value,
+  onChange,
+  onSubidas,
+}: {
+  value: string[];
+  onChange: (v: string[]) => void;
+  /** Avisa qué fotos se acaban de subir, para poder borrarlas si se descartan sin guardar. */
+  onSubidas: (ids: string[]) => void;
+}) {
   const input = useRef<HTMLInputElement>(null);
   const [subiendo, setSubiendo] = useState(false);
 
   const onFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     setSubiendo(true);
+    const nuevas: string[] = [];
     try {
-      const nuevas: string[] = [];
       for (const f of Array.from(files).slice(0, 8 - value.length)) nuevas.push(await subir(f));
-      onChange([...value, ...nuevas]);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al subir");
     } finally {
+      // Registra también las que sí se subieron antes de un posible fallo
+      if (nuevas.length > 0) {
+        onSubidas(nuevas);
+        onChange([...value, ...nuevas]);
+      }
       setSubiendo(false);
       if (input.current) input.current.value = "";
     }

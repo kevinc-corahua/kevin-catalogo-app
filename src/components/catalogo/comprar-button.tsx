@@ -4,28 +4,28 @@ import { whatsappUrl } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 
 /** Comprar / Separar abren WhatsApp con el mensaje ya armado. */
-export function ComprarButton({ prenda }: { prenda: PrendaVista }) {
+export function ComprarButton({ prenda, className }: { prenda: PrendaVista; className?: string }) {
   if (prenda.estado === "VENDIDO") {
     return (
-      <Button disabled className="w-full">
+      <Button disabled className={cn("w-full", className)}>
         Agotado
       </Button>
     );
   }
   if (prenda.estado === "SEPARADO") {
     return (
-      <Button disabled variant="secondary" className="w-full">
+      <Button disabled variant="secondary" className={cn("w-full", className)}>
         Separado
       </Button>
     );
   }
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className={cn("flex gap-2", className)}>
       <a
         href={whatsappUrl(prenda, "comprar")}
         target="_blank"
         rel="noopener noreferrer"
-        className={cn(buttonVariants())}
+        className={cn(buttonVariants(), "flex-1 font-semibold")}
       >
         Comprar
       </a>
