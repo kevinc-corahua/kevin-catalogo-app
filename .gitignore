@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+
+!.env.example
+
+.vercel
+.env*
+
+# herramientas de agentes (docs instaladas por skills)
+/.agents
+/.windsurf
+/.claude
+/skills-lock.json

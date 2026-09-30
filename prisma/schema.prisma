@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Estado {
+  DISPONIBLE
+  SEPARADO
+  VENDIDO
+}
+
+enum Condicion {
+  COMO_NUEVA
+  BUENA
+  CON_DETALLE
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Tipo {
+  id      Int      @id @default(autoincrement())
+  nombre  String   @unique
+  prendas Prenda[]
+}
+
+model Genero {
+  id      Int      @id @default(autoincrement())
+  nombre  String   @unique
+  prendas Prenda[]
+}
+
+model Talla {
+  id      Int      @id @default(autoincrement())
+  nombre  String   @unique
+  orden   Int      @default(0)
+  prendas Prenda[]
+}
+
+model Marca {
+  id      Int      @id @default(autoincrement())
+  nombre  String   @unique
+  prendas Prenda[]
+}
+
+model Prenda {
+  id            String    @id @default(cuid())
+  codigo        String    @unique
+  nombre        String
+  descripcion   String?
+  precio        Decimal   @db.Decimal(10, 2)
+  estado        Estado    @default(DISPONIBLE)
+  separadoHasta DateTime?
+  condicion     Condicion @default(BUENA)
+  detalles      String?
+  // Medidas en cm: { pecho, largo, cintura, ... }
+  medidas       Json?
+  // public_id de Cloudinary, la primera es la portada
+  fotos         String[]
+
+  tipoId   Int
+  generoId Int
+  tallaId  Int
+  marcaId  Int
+  tipo     Tipo   @relation(fields: [tipoId], references: [id])
+  genero   Genero @relation(fields: [generoId], references: [id])
+  talla    Talla  @relation(fields: [tallaId], references: [id])
+  marca    Marca  @relation(fields: [marcaId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  vendidoAt DateTime?
+  deletedAt DateTime?
+
+  historial HistorialEstado[]
+
+  @@index([estado, deletedAt])
+  @@index([tipoId])
+  @@index([generoId])
+  @@index([tallaId])
+  @@index([marcaId])
+}
+
+model HistorialEstado {
+  id        String   @id @default(cuid())
+  prendaId  String
+  prenda    Prenda   @relation(fields: [prendaId], references: [id], onDelete: Cascade)
+  estado    Estado
+  createdAt DateTime @default(now())
+
+  @@index([prendaId])
+}
+
+// Contador para generar códigos KV-0001, KV-0002...
+model Contador {
+  id    String @id
+  valor Int    @default(0)
+}
+
+// Intentos de login para limitar fuerza bruta
+model LoginIntento {
+  id        String   @id @default(cuid())
+  ip        String
+  createdAt DateTime @default(now())
+
+  @@index([ip, createdAt])
+}
